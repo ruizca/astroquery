@@ -815,19 +815,14 @@ class BaseWFAUClass(QueryWithLogin):
 
         if hasattr(self, 'session') and self.logged_in():
             response = self.session.post(self.CROSSID_URL,
-                                         params=request_payload,
+                                         data=request_payload,
                                          files={'file.txt': fh},
                                          timeout=self.TIMEOUT)
         else:
             response = self._request("POST", url=self.CROSSID_URL,
-                                     params=request_payload,
+                                     data=request_payload,
                                      files={'file.txt': fh},
                                      timeout=self.TIMEOUT)
-
-        raise NotImplementedError("It appears we haven't implemented the file "
-                                  "upload correctly.  Help is needed.")
-
-        # response = self._check_page(response.url, "query finished")
 
         return response
 
