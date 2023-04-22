@@ -833,7 +833,12 @@ class BaseWFAUClass(QueryWithLogin):
         if get_query_payload:
             return response
 
-        result = self._parse_result(response, verbose=verbose)
+        try:
+            result = self._parse_result(response, verbose=verbose)
+        except Exception as e:
+            self._last_query.remove_cache_file(self.cache_location)
+            raise e
+        
         return result
 
 
