@@ -762,7 +762,7 @@ class BaseWFAUClass(QueryWithLogin):
             Defaults to `False`.
         """
 
-        if table == "source":
+        if table == "source" or table == "sourceView":
             constraints += "(priOrSec<=0 OR priOrSec=frameSetID)"
         if database is None:
             database = self.database
@@ -779,26 +779,21 @@ class BaseWFAUClass(QueryWithLogin):
                                                 system=system,
                                                 query_type='catalog')
         request_payload['radius'] = _parse_dimension(radius, unit="arcsec")
-        request_payload['from'] = 'source'
-        request_payload['formaction'] = 'region'
-        request_payload['xSize'] = ''
-        request_payload['ySize'] = ''
-        request_payload['boxAlignment'] = 'RADec'
-        request_payload['emailAddress'] = ''
-        request_payload['format'] = 'VOT'
-        request_payload['compress'] = 'NONE'
-        request_payload['rows'] = 1
-        request_payload['select'] = 'default'
-        request_payload['where'] = ''
+        request_payload.pop("ra")
+        request_payload.pop("dec")
         request_payload['disp'] = ''
         request_payload['baseTable'] = table
         request_payload['whereClause'] = constraints
         request_payload['qType'] = 'form'
         request_payload['selectList'] = attributes
         request_payload['uploadFile'] = 'file.txt'
+        request_payload['emailAddress'] = ''
+        request_payload['format'] = 'VOT'
+        request_payload['compress'] = 'NONE'
+        request_payload['rows'] = 0
         if pairing not in ('nearest', 'all'):
             raise ValueError("pairing must be one of 'nearest' or 'all'")
-        request_payload['nearest'] = 0 if pairing == 'nearest' else 1
+        request_payload['nearest'] = 1 if pairing == 'nearest' else 0
 
         # for some reason, this is required on the VISTA website
         if self.archive is not None:
