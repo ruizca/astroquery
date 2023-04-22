@@ -778,7 +778,7 @@ class BaseWFAUClass(QueryWithLogin):
                                                 database=database,
                                                 system=system,
                                                 query_type='catalog')
-        request_payload['radius'] = _parse_dimension(radius)
+        request_payload['radius'] = _parse_dimension(radius, unit="arcsec")
         request_payload['from'] = 'source'
         request_payload['formaction'] = 'region'
         request_payload['xSize'] = ''
@@ -878,27 +878,37 @@ def clean_catalog(wfau_catalog, *, clean_band='K_1', badclass=-9999,
     return wfau_catalog.data[mask]
 
 
-def _parse_dimension(dim):
+def _parse_dimension(dim, unit="arcmin"):
     """
     Parses the radius and returns it in the format expected by WFAU.
 
     Parameters
     ----------
     dim : str, `~astropy.units.Quantity`
+    unit : str
+        Unit for the output radius: "arcsec" for query_cross_id services ,
+        "arcmin" for the rest (default).
 
     Returns
     -------
-    dim_in_min : float
-        The value of the radius in arcminutes.
+    dim_in_unit : float
+        The value of the radius in the selected unit.
     """
+    if unit == "arcmin":
+        unit = u.arcmin
+    elif unit == "arcsec":
+        unit = u.arcsec
+    else:
+        raise ValueError("Invalid unit: %s", unit)
+
     if (isinstance(dim, u.Quantity) and dim.unit in u.deg.find_equivalent_units()):
-        dim_in_min = dim.to(u.arcmin).value
+        dim_in_unit = dim.to(unit).value
     # otherwise must be an Angle or be specified in hours...
     else:
         try:
             new_dim = coord.Angle(dim).degree
-            dim_in_min = u.Quantity(
-                value=new_dim, unit=u.deg).to(u.arcmin).value
+            dim_in_unit = u.Quantity(
+                value=new_dim, unit=u.deg).to(unit).value
         except (u.UnitsError, coord.errors.UnitsError, AttributeError):
             raise u.UnitsError("Dimension not in proper units")
-    return dim_in_min
+    return dim_in_unit
