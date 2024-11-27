@@ -327,7 +327,8 @@ class XMMNewtonClass(BaseQuery):
 
     def _create_filename(self, filename, observation_id, suffixes):
         if filename is not None:
-            filename = os.path.basename(os.path.splitext(filename)[0])
+            # filename = os.path.basename(os.path.splitext(filename)[0])
+            filename = os.path.splitext(filename)[0]
         else:
             filename = observation_id
         filename += "".join(suffixes)
