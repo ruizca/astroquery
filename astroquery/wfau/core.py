@@ -762,7 +762,7 @@ class BaseWFAUClass(QueryWithLogin):
             Defaults to `False`.
         """
 
-        if table == "source":
+        if table == "source" or table == "sourceView":
             constraints += "(priOrSec<=0 OR priOrSec=frameSetID)"
         if database is None:
             database = self.database
@@ -778,27 +778,22 @@ class BaseWFAUClass(QueryWithLogin):
                                                 database=database,
                                                 system=system,
                                                 query_type='catalog')
-        request_payload['radius'] = _parse_dimension(radius)
-        request_payload['from'] = 'source'
-        request_payload['formaction'] = 'region'
-        request_payload['xSize'] = ''
-        request_payload['ySize'] = ''
-        request_payload['boxAlignment'] = 'RADec'
-        request_payload['emailAddress'] = ''
-        request_payload['format'] = 'VOT'
-        request_payload['compress'] = 'NONE'
-        request_payload['rows'] = 1
-        request_payload['select'] = 'default'
-        request_payload['where'] = ''
+        request_payload['radius'] = _parse_dimension(radius, unit="arcsec")
+        request_payload.pop("ra")
+        request_payload.pop("dec")
         request_payload['disp'] = ''
         request_payload['baseTable'] = table
         request_payload['whereClause'] = constraints
         request_payload['qType'] = 'form'
         request_payload['selectList'] = attributes
         request_payload['uploadFile'] = 'file.txt'
+        request_payload['emailAddress'] = ''
+        request_payload['format'] = 'VOT'
+        request_payload['compress'] = 'NONE'
+        request_payload['rows'] = 0
         if pairing not in ('nearest', 'all'):
             raise ValueError("pairing must be one of 'nearest' or 'all'")
-        request_payload['nearest'] = 0 if pairing == 'nearest' else 1
+        request_payload['nearest'] = 1 if pairing == 'nearest' else 0
 
         # for some reason, this is required on the VISTA website
         if self.archive is not None:
@@ -815,19 +810,14 @@ class BaseWFAUClass(QueryWithLogin):
 
         if hasattr(self, 'session') and self.logged_in():
             response = self.session.post(self.CROSSID_URL,
-                                         params=request_payload,
+                                         data=request_payload,
                                          files={'file.txt': fh},
                                          timeout=self.TIMEOUT)
         else:
             response = self._request("POST", url=self.CROSSID_URL,
-                                     params=request_payload,
+                                     data=request_payload,
                                      files={'file.txt': fh},
                                      timeout=self.TIMEOUT)
-
-        raise NotImplementedError("It appears we haven't implemented the file "
-                                  "upload correctly.  Help is needed.")
-
-        # response = self._check_page(response.url, "query finished")
 
         return response
 
@@ -843,7 +833,12 @@ class BaseWFAUClass(QueryWithLogin):
         if get_query_payload:
             return response
 
-        result = self._parse_result(response, verbose=verbose)
+        try:
+            result = self._parse_result(response, verbose=verbose)
+        except Exception as e:
+            self._last_query.remove_cache_file(self.cache_location)
+            raise e
+        
         return result
 
 
@@ -883,27 +878,37 @@ def clean_catalog(wfau_catalog, *, clean_band='K_1', badclass=-9999,
     return wfau_catalog.data[mask]
 
 
-def _parse_dimension(dim):
+def _parse_dimension(dim, unit="arcmin"):
     """
     Parses the radius and returns it in the format expected by WFAU.
 
     Parameters
     ----------
     dim : str, `~astropy.units.Quantity`
+    unit : str
+        Unit for the output radius: "arcsec" for query_cross_id services ,
+        "arcmin" for the rest (default).
 
     Returns
     -------
-    dim_in_min : float
-        The value of the radius in arcminutes.
+    dim_in_unit : float
+        The value of the radius in the selected unit.
     """
+    if unit == "arcmin":
+        unit = u.arcmin
+    elif unit == "arcsec":
+        unit = u.arcsec
+    else:
+        raise ValueError("Invalid unit: %s", unit)
+
     if (isinstance(dim, u.Quantity) and dim.unit in u.deg.find_equivalent_units()):
-        dim_in_min = dim.to(u.arcmin).value
+        dim_in_unit = dim.to(unit).value
     # otherwise must be an Angle or be specified in hours...
     else:
         try:
             new_dim = coord.Angle(dim).degree
-            dim_in_min = u.Quantity(
-                value=new_dim, unit=u.deg).to(u.arcmin).value
+            dim_in_unit = u.Quantity(
+                value=new_dim, unit=u.deg).to(unit).value
         except (u.UnitsError, coord.errors.UnitsError, AttributeError):
             raise u.UnitsError("Dimension not in proper units")
-    return dim_in_min
+    return dim_in_unit
